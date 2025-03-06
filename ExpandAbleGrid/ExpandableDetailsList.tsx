@@ -1,30 +1,65 @@
 import * as React from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import AttendanceRateIcon from './AttendanceRate';
 import {
 	DetailsList, DetailsListLayoutMode, Selection, SelectionMode, IColumn, IDetailsListStyles, CheckboxVisibility,
 	IDetailsFooterProps, DetailsRow, ConstrainMode, IDetailsRowStyles, IDetailsColumnProps, IDetailsListProps,
 	IDetailsRowBaseProps
 } from '@fluentui/react/lib/DetailsList';
 import { IconButton } from '@fluentui/react/lib/Button';
-import { IRenderFunction } from '@fluentui/react/lib/Utilities';
+import { ChevronDownRegular, ChevronRightRegular, StarRegular, CaretUpRegular } from "@fluentui/react-icons";
+import { IRenderFunction, IObjectWithKey } from '@fluentui/react/lib/Utilities';
 import { TextField, ITextFieldProps, ITextFieldStyleProps, ITextFieldStyles } from '@fluentui/react/lib/TextField';
 import { mergeStyles } from '@fluentui/react/lib/Styling';
 import { getTheme } from '@fluentui/react/lib/Styling';
 import { Stack, IStackStyles, IStackTokens, IStackItemStyles } from '@fluentui/react/lib/Stack';
 import { DefaultButton, PrimaryButton } from '@fluentui/react/lib/Button';
-import { FluentProvider, webLightTheme, Button } from '@fluentui/react-components';
+import { FluentProvider, webLightTheme, Button, Avatar } from '@fluentui/react-components';
 import { FontIcon, Icon } from '@fluentui/react/lib/Icon';
+import { ScrollablePane, ScrollbarVisibility } from "@fluentui/react/lib/ScrollablePane";
 export interface IExpandableDetailsListProp {
 	context: any;
+	dataSet: ComponentFramework.PropertyTypes.DataSet;
+	paging: any;
+	notifyOutputChanged: () => void;
+
 }
 import { SendRegular, CheckmarkRegular } from "@fluentui/react-icons";
 import { makeStyles, shorthands } from "@fluentui/react-components";
+
+type DataSet = ComponentFramework.PropertyHelper.DataSetApi.EntityRecord & IObjectWithKey;
+
 const theme = getTheme();
 
 const wrapStackTokens: IStackTokens = { childrenGap: 60 };
 const innerTableStackTokens: IStackTokens = { childrenGap: 30 };
 const wrapStackTokensInnerButton: IStackTokens = { childrenGap: 7 };
 const headingStackTokens: IStackTokens = { childrenGap: 30 };
+const studentStackTokens: IStackTokens = { childrenGap: 10 };
+
+//#region Styles
+const gridStyles: Partial<IDetailsListStyles> = {
+	root: {
+		selectors: {
+			'& [role=grid]': {
+				display: 'flex',
+				flexDirection: 'column',
+				alignItems: 'start',
+				//height: 'var(--gridMainHeight)',
+				height: '700px',
+				width: '100%',
+			},
+		},
+	},
+	headerWrapper: {
+		flex: '0 0 auto',
+	},
+	contentWrapper: {
+		flex: '1 1 auto',
+		width: '100%',
+		overflowX: 'hidden',
+	},
+};
 const nonSelectedRowClass = mergeStyles({
 	// selectors: {
 	// 	'.ms-DetailsRow-cell': {
@@ -49,6 +84,20 @@ const nonSelectedRowClass = mergeStyles({
 	}
 });
 
+const noBgButtonClass = mergeStyles({
+	border: 'none !important',
+	backgroundColor: 'transparent !important',
+	':hover': {
+		backgroundColor: 'transparent !important',
+	},
+	':active': {
+		backgroundColor: 'transparent !important',
+	},
+	':focus': {
+		backgroundColor: 'transparent !important',
+	},
+});
+
 const useClasses = makeStyles({
 	icon24: { fontSize: "24px" },
 	icon32: { fontSize: "32px" },
@@ -60,28 +109,29 @@ const useClasses = makeStyles({
 	},
 });
 
-const gridStyles: Partial<IDetailsListStyles> = {
-	root: {
-		overflowX: 'scroll',
-		selectors: {
-			'& [role=grid]': {
-				display: 'flex',
-				flexDirection: 'column',
-				alignItems: 'start',
-				height: '100%',
-				width: '100%',
-			},
-		},
-	},
-	headerWrapper: {
-		flex: '0 0 auto',
-	},
-	contentWrapper: {
-		flex: '1 1 auto',
-		// overflow: 'scroll',
-		overflowY: 'auto',
-	},
-};
+// const gridStyles: Partial<IDetailsListStyles> = {
+// 	root: {
+// 		overflowX: 'scroll',
+// 		selectors: {
+// 			'& [role=grid]': {
+// 				display: 'flex',
+// 				flexDirection: 'column',
+// 				alignItems: 'start',
+// 				height: '100%',
+// 				width: '100%',
+// 			},
+// 		},
+// 	},
+// 	headerWrapper: {
+// 		flex: '0 0 auto',
+// 	},
+// 	contentWrapper: {
+// 		flex: '1 1 auto',
+// 		// overflow: 'scroll',
+// 		// overflowY: 'auto',
+// 		overflow: 'hidden',
+// 	},
+// };
 
 const selectedRowClass = mergeStyles({
 	// selectors: {
@@ -109,15 +159,107 @@ const editingCellOutlineClass = mergeStyles({
 	paddingLeft: '0px !important',
 	paddingRight: '0px !important',
 });
+const greenColumnClass = mergeStyles({
+	width: '100%',
+	selectors: {
+		"&.ms-DetailsRow-cell": {
+			position: "relative",
+			backgroundColor: "transparent !important",
+			width: '100%',
+			//overlay pseudo-element
+			"::before": {
+				content: '""',
+				position: "absolute",
+				top: 0,
+				left: 0,
+				right: 0,
+				bottom: 0,
+				backgroundColor: "rgba(0, 128, 0, 0.06)", //0.06% alpha
+				pointerEvents: "none",
+				zIndex: 1,
+			},
+		},
+	},
+	"& > *": {
+		zIndex: 2,
+	}
+});
 
+const blueColumnClass = mergeStyles({
+	position: "relative",
+	width: '100%',
+	backgroundColor: "transparent !important",
+	"::before": {
+		width: '100%',
+		content: '""',
+		position: "absolute",
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
+		backgroundColor: "rgba(228, 236, 247, 0.7)",
+		pointerEvents: "none",
+		zIndex: 1,
+	},
+	"& > *": {
+		zIndex: 2,
+	}
+});
+
+const greenHeaderClass = mergeStyles({
+	position: "relative",
+	width: '100%',
+	backgroundColor: "transparent !important",
+	"::before": {
+		width: '100%',
+		content: '""',
+		position: "absolute",
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
+		backgroundColor: "rgba(0, 128, 0, 0.06)",
+		pointerEvents: "none",
+		zIndex: 1,
+	},
+	selectors: {
+		"& > *": {
+			zIndex: 2,
+		},
+	},
+});
+
+const blueHeaderClass = mergeStyles({
+	position: "relative",
+	width: '100%',
+	backgroundColor: "transparent !important",
+	"::before": {
+		width: '100%',
+		content: '""',
+		position: "absolute",
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
+		backgroundColor: "rgba(228, 236, 247, 0.5)",
+		pointerEvents: "none",
+		zIndex: 1,
+	},
+	selectors: {
+		"& > *": {
+			zIndex: 2,
+		},
+	},
+});
+//#endregion
 const initialItems = [
-	{ key: '1', A: 'Student Name', B: 'House Name ID1234', C: 'Today', D: 'Item 1-D', E: 'Item 1-E', F: 'Item 1-F' },
-	{ key: '2', A: 'Student Name', B: 'House Name ID1234', C: 'Today', D: 'Item 1-D', E: 'Item 1-E', F: 'Item 1-F' },
-	{ key: '3', A: 'Student Name', B: 'House Name ID1234', C: 'Today', D: 'Item 1-D', E: 'Item 1-E', F: 'Item 1-F' },
-	{ key: '4', A: 'Student Name', B: 'House Name ID1234', C: 'Today', D: 'Item 1-D', E: 'Item 1-E', F: 'Item 1-F' },
-	{ key: '5', A: 'Student Name', B: 'House Name ID1234', C: 'Today', D: 'Item 1-D', E: 'Item 1-E', F: 'Item 1-F' },
-	{ key: '6', A: 'Student Name', B: 'House Name ID1234', C: 'Today', D: 'Item 1-D', E: 'Item 1-E', F: 'Item 1-F' },
-	{ key: '7', A: 'Item 2-A', B: 'Item 2-B', C: 'Item 2-C', D: 'Item 2-D', E: 'Item 2-E', F: 'Item 2-F' },
+	{ key: '1', StudentInfo: 'Student Name', B: 'House Name ID1234', C: 'Today', D: 'Item 1-D', E: 'Item 1-E', F: 'Item 1-F' },
+	{ key: '2', StudentInfo: 'Student Name', B: 'House Name ID1234', C: 'Today', D: 'Item 1-D', E: 'Item 1-E', F: 'Item 1-F' },
+	{ key: '3', StudentInfo: 'Student Name', B: 'House Name ID1234', C: 'Today', D: 'Item 1-D', E: 'Item 1-E', F: 'Item 1-F' },
+	{ key: '4', StudentInfo: 'Student Name', B: 'House Name ID1234', C: 'Today', D: 'Item 1-D', E: 'Item 1-E', F: 'Item 1-F' },
+	{ key: '5', StudentInfo: 'Student Name', B: 'House Name ID1234', C: 'Today', D: 'Item 1-D', E: 'Item 1-E', F: 'Item 1-F' },
+	{ key: '6', StudentInfo: 'Student Name', B: 'House Name ID1234', C: 'Today', D: 'Item 1-D', E: 'Item 1-E', F: 'Item 1-F' },
+	{ key: '7', StudentInfo: 'Item 2-A', B: 'Item 2-B', C: 'Item 2-C', D: 'Item 2-D', E: 'Item 2-E', F: 'Item 2-F' },
 ];
 
 const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp> = (props) => {
@@ -127,13 +269,13 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 	const toggleExpanded = () => setExpanded(prev => !prev);
 	const classes = useClasses();
 	const baseColumns: IColumn[] = [
-		{ key: 'A', name: 'A', fieldName: 'A', minWidth: 50, maxWidth: 100, isResizable: true },
-		{ key: 'B', name: 'B', fieldName: 'B', minWidth: 50, maxWidth: 100, isResizable: true },
+		{ key: 'StudentInfo', name: '', fieldName: 'StudentInfo', minWidth: 150, maxWidth: 150, isResizable: true },
+		{ key: 'StudentProfile', name: '', fieldName: 'StudentProfile', minWidth: 200, maxWidth: 200, isResizable: true },
 		{
-			key: 'C',
+			key: 'History',
 			name: 'HISTORY',
-			fieldName: 'C',
-			minWidth: 100,
+			fieldName: 'History',
+			minWidth: 200,
 			maxWidth: 200,
 			isResizable: true,
 			onRenderHeader: (colProps?: IDetailsColumnProps, defaultRender?: IRenderFunction<IDetailsColumnProps>,): JSX.Element | null => (
@@ -142,118 +284,31 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 					onClick={toggleExpanded}
 				>
 					<span>HISTORY</span>
-					<IconButton
-						iconProps={{ iconName: expanded ? 'ChevronRight' : 'ChevronDown' }}
-						title={expanded ? 'Collapse' : 'Expand'}
-						ariaLabel={expanded ? 'Collapse' : 'Expand'}
+					<Button
+						size="medium"
+						icon={expanded ? <ChevronRightRegular /> : <ChevronDownRegular />}
 						onClick={(e) => {
 							e.stopPropagation();
 							toggleExpanded();
 						}}
+						title={expanded ? 'Collapse' : 'Expand'}
+						aria-label={expanded ? 'Collapse' : 'Expand'}
+						className={noBgButtonClass}
 					/>
+
 				</div>
 			)
 		}
 	];
-	const stackStyles: IStackStyles = {
-		root: {
-			height: '42px',
-			width: '100%',
-		},
-	};
-
-	const greenColumnClass = mergeStyles({
-		// Nhắm đúng ô (cell) của cột F
-		selectors: {
-			"&.ms-DetailsRow-cell": {
-				position: "relative",
-				// Giữ cho cell trong suốt, để nhìn thấy màu row bên dưới
-				backgroundColor: "transparent !important",
-
-				// Tạo overlay bằng pseudo-element
-				"::before": {
-					content: '""',
-					position: "absolute",
-					top: 0,
-					left: 0,
-					right: 0,
-					bottom: 0,
-					backgroundColor: "rgba(0, 128, 0, 0.06)", // màu xanh lá nhạt 20% alpha
-					pointerEvents: "none", // không cản trở tương tác
-					zIndex: 1,            // nằm trên nền cell, dưới nội dung
-				},
-			},
-		},
-	});
-
-	const blueColumnClass = mergeStyles({
-		position: "relative",
-		backgroundColor: "transparent !important",
-		"::before": {
-			content: '""',
-			position: "absolute",
-			top: 0,
-			left: 0,
-			right: 0,
-			bottom: 0,
-			backgroundColor: "rgba(228, 236, 247, 0.7)",
-			pointerEvents: "none",
-			zIndex: 1,
-		},
-	});
-
-	// Nếu muốn header cũng có màu tương ứng:
-	const greenHeaderClass = mergeStyles({
-		position: "relative",
-		backgroundColor: "transparent !important",
-		"::before": {
-			content: '""',
-			position: "absolute",
-			top: 0,
-			left: 0,
-			right: 0,
-			bottom: 0,
-			backgroundColor: "rgba(0, 128, 0, 0.06)",
-			pointerEvents: "none",
-			zIndex: 1,
-		},
-		selectors: {
-			"& > *": {
-			  position: "relative",
-			  zIndex: 2,
-			},
-		  },
-	});
-
-	const blueHeaderClass = mergeStyles({
-		position: "relative",
-		backgroundColor: "transparent !important",
-		"::before": {
-			content: '""',
-			position: "absolute",
-			top: 0,
-			left: 0,
-			right: 0,
-			bottom: 0,
-			backgroundColor: "rgba(228, 236, 247, 0.5)",
-			pointerEvents: "none",
-			zIndex: 1,
-		},
-		selectors: {
-			"& > *": {
-			  position: "relative",
-			  zIndex: 2,
-			},
-		  },
-	});
 
 	const extraColumns: IColumn[] = [
 		{
-			key: 'D', name: 'Line1\nLine2\nLine3', fieldName: 'D', minWidth: 50, maxWidth: 100, isResizable: true,
+			key: 'D', name: 'Line1\nLine2\nLine3', fieldName: 'D', minWidth: 50, maxWidth: 50, isResizable: true,
 			onRenderHeader: (colProps?: IDetailsColumnProps, defaultRender?: IRenderFunction<IDetailsColumnProps>,): JSX.Element | null => (
 				<div
 					className={mergeStyles({
 						minHeight: '30px',
+						width: '100%',
 						height: 'auto',
 						padding: '4px 0px',
 						display: 'flex',
@@ -271,7 +326,7 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 			)
 		},
 		{
-			key: 'E', name: 'E', fieldName: 'E', minWidth: 50, maxWidth: 100, isResizable: true,
+			key: 'E', name: 'E', fieldName: 'E', minWidth: 50, maxWidth: 50, isResizable: true,
 			onRenderHeader: (colProps?: IDetailsColumnProps, defaultRender?: IRenderFunction<IDetailsColumnProps>,): JSX.Element | null => (
 				<div
 					className={mergeStyles({
@@ -293,9 +348,9 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 			)
 		},
 		{
-			key: 'F', name: 'F', fieldName: 'F', minWidth: 50, maxWidth: 100, isResizable: true,
-			className: greenColumnClass,       // Cells cột F
-			headerClassName: greenHeaderClass, // Header cột F
+			key: 'F', name: 'F', fieldName: 'F', minWidth: 50, maxWidth: 50, isResizable: true,
+			className: greenColumnClass,
+			headerClassName: greenHeaderClass,
 			onRenderHeader: (colProps?: IDetailsColumnProps, defaultRender?: IRenderFunction<IDetailsColumnProps>,): JSX.Element | null => (
 				<div
 					className={mergeStyles({
@@ -318,7 +373,7 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 		}
 		,
 		{
-			key: 'G', name: 'G', fieldName: 'G', minWidth: 50, maxWidth: 100, isResizable: true,
+			key: 'G', name: 'G', fieldName: 'G', minWidth: 50, maxWidth: 50, isResizable: true,
 			className: blueColumnClass,       // Cells cột F
 			headerClassName: blueHeaderClass, // Header cột F
 			onRenderHeader: (colProps?: IDetailsColumnProps, defaultRender?: IRenderFunction<IDetailsColumnProps>,): JSX.Element | null => (
@@ -362,6 +417,21 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 					<span style={{ lineHeight: '1.2', marginTop: -2 }}>P5</span>
 				</div>
 			)
+		},
+		{
+			key: 'AttendanceRate', name: 'Attendance Rate', fieldName: 'AttendanceRate', minWidth: 50, maxWidth: 50, isResizable: true,
+			// onRender(item, index, column) {
+			// 	if (column?.key === columns[columns.length - 1].key) {
+			// 		// This is the last column
+			// 		return (
+			// 		  <div style={{ borderLeft: "2px solid black", height: "100%", padding: 4 }}>
+			// 			{item[column.fieldName as keyof typeof item]}
+			// 		  </div>
+			// 		);
+			// 	  }
+			// 	  // Default rendering
+			// 	  return <span>{item[column?.fieldName as keyof typeof item]}</span>;
+			// },
 		}
 	];
 
@@ -375,12 +445,46 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 
 	const columns: IColumn[] = expanded ? [...baseColumns, ...extraColumns] : baseColumns;
 
+	//#region Custom Items for each cell
 	const onRenderItemColumn = (item?: any, index?: number, column?: IColumn) => {
+		// Render custom item for each cell
 		if (column?.fieldName !== undefined) {
-			if (column?.fieldName === 'C') {
+			if (column?.fieldName === 'StudentInfo') {
+				return (
+					<Stack enableScopedSelectors horizontal verticalAlign='center' tokens={studentStackTokens} style={{ width: '100%', height: '100%' }}>
+						<Stack.Item  >
+							<Avatar
+								name="Katri Athokas"
+								image={{
+									src: "https://fabricweb.azureedge.net/fabric-website/assets/images/avatar/KatriAthokas.jpg",
+								}} />
+						</Stack.Item>
+						<Stack.Item>
+							{item[column.fieldName as keyof any]}
+						</Stack.Item>
+					</Stack>
+				)
+			}
+			if (column?.fieldName === 'StudentProfile') {
+				return (
+					<Stack enableScopedSelectors horizontal verticalAlign='center' tokens={studentStackTokens} style={{ width: '100%', height: '100%' }}>
+						<Stack.Item >
+							<StarRegular />
+						</Stack.Item>
+						<Stack.Item>
+							<CaretUpRegular />
+						</Stack.Item>
+						<Stack.Item>
+							House Name ID1234
+						</Stack.Item>
+					</Stack>
+				)
+			}
+
+			if (column?.fieldName === 'History') {
 				return (
 					<div style={{ width: '100%', height: '100%', padding: '1px 0' }}>
-						<Stack enableScopedSelectors horizontalAlign="start" horizontal tokens={innerTableStackTokens}>
+						<Stack enableScopedSelectors horizontalAlign="start" verticalAlign='center' horizontal tokens={innerTableStackTokens}>
 							<span >Today</span>
 							<table style={{ width: '100px', borderCollapse: 'collapse' }}>
 								<tbody>
@@ -395,8 +499,8 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 										<td style={{ border: 'none' }}><CheckmarkRegular className={classes.icon48} /></td>
 										<td style={{ border: 'none' }}><CheckmarkRegular className={classes.icon48} /></td>
 										<td style={{ border: 'none' }}><CheckmarkRegular className={classes.icon48} /></td>
-										<td style={{ border: 'none' }}>4</td>
-										<td style={{ border: 'none' }}>5</td>
+										<td style={{ border: 'none' }}></td>
+										<td style={{ border: 'none' }}></td>
 									</tr>
 								</tbody>
 							</table>
@@ -417,6 +521,14 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 				);
 			}
 
+			if (column?.fieldName === 'AttendanceRate') {
+				return (
+					<div style={{ width: '100%', height: '100%', position: 'relative', zIndex: 2, alignItems: 'center' }}>
+						<AttendanceRateIcon content={'99%'} diameter={40} backgroundColor="#28a745" />
+
+					</div>
+				);
+			}
 
 			return (
 				<div style={{ width: '100%', height: '100%', padding: '1px 0' }}>
@@ -467,6 +579,7 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 		}
 		return item[column?.fieldName ?? ''];
 	};
+	//#endregion
 
 	const selection = React.useMemo(
 		() =>
@@ -478,6 +591,23 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 			}),
 		[]
 	);
+
+	useEffect(() => {
+		let items: any = props.dataSet.sortedRecordIds.map((id: string) => {
+			const record = props.dataSet.records[id];
+			return {
+				key: record.getRecordId(),
+				StudentInfo: record.getValue('fullname'),
+				B: record.getValue('house'),
+				C: record.getValue('birthdate'),
+				D: record.getValue('address1_line1'),
+				E: record.getValue('address1_line2'),
+				F: record.getValue('address1_line3'),
+			};
+		})
+
+		setItems(items);
+	}, [props.dataSet]);
 
 	const _onRenderRow: IDetailsListProps['onRenderRow'] = props => {
 		if (!props) return null;
@@ -513,40 +643,50 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 			customStyles.root = { backgroundColor: theme.palette.neutralLighterAlt };
 		}
 
-
 		return <DetailsRow {...props as IDetailsRowBaseProps}
 			styles={customStyles}
 			className={isSelected ? selectedRowClass : nonSelectedRowClass}
 		/>;
 	};
-
+	const stackDetailListItemStyles: IStackItemStyles = {
+		root: {
+			width: '100%',
+			overflowY: 'hidden',
+			overflowX: 'hidden'
+		},
+	};
 	return (
 		<div style={{ height: '100%', width: '100%' }}>
 			<FluentProvider theme={webLightTheme}>
-				<Stack enableScopedSelectors verticalAlign="space-around" >
-					<Stack enableScopedSelectors horizontalAlign="end" horizontal wrap tokens={wrapStackTokens}>
-						<Stack enableScopedSelectors horizontalAlign="end" horizontal wrap tokens={wrapStackTokensInnerButton}>
 
-							<DefaultButton text="Mark All as Present" allowDisabledFocus />
-							<DefaultButton text="Seating Plan" allowDisabledFocus />
-							<DefaultButton text="Class Team" allowDisabledFocus />
-							<DefaultButton text="Print List" allowDisabledFocus />
+				<Stack enableScopedSelectors verticalFill grow verticalAlign="space-around" tokens={{ childrenGap: 20 }}>
+					<Stack enableScopedSelectors horizontalAlign="end" horizontal wrap tokens={wrapStackTokens} style={{ width: '100%' }}>
+						<Stack enableScopedSelectors horizontalAlign="end" horizontal wrap tokens={wrapStackTokensInnerButton}>
+							<Button>Mark All as Present</Button>
+							<Button>Seating Plan</Button>
+							<Button>Class Team</Button>
+							<Button>Print List</Button>
+							{/* <DefaultButton>Mark All as Present</DefaultButton>
+							<DefaultButton>Seating Plan</DefaultButton>
+							<DefaultButton>Class Team</DefaultButton>
+							<DefaultButton>Print List</DefaultButton> */}
 						</Stack>
 
-						<DefaultButton text="Submit" allowDisabledFocus />
+						<Button>Submit</Button>
 					</Stack>
-					<Stack>
+					<Stack styles={stackDetailListItemStyles} >
 						<DetailsList
 							items={items}
 							columns={columns}
-							//styles={gridStyles}
+							styles={gridStyles}
+							//compact={false}
 							//constrainMode={ConstrainMode.unconstrained}
 							//layoutMode={DetailsListLayoutMode.fixedColumns}
 							setKey="set"
 							onRenderItemColumn={onRenderItemColumn}
 							onRenderRow={_onRenderRow}
 							selectionPreservedOnEmptyClick={true}
-
+							checkboxVisibility={CheckboxVisibility.hidden}
 							selection={selection}
 						/>
 					</Stack>

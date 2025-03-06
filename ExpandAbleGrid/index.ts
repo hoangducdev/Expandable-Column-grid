@@ -7,7 +7,7 @@ type DataSet = ComponentFramework.PropertyTypes.DataSet;
 
 export class ExpanAbleGrid implements ComponentFramework.ReactControl<IInputs, IOutputs> {
     private notifyOutputChanged: () => void;
-
+    private root: any;
     /**
      * Empty constructor.
      */
@@ -36,7 +36,12 @@ export class ExpanAbleGrid implements ComponentFramework.ReactControl<IInputs, I
      * @returns ReactElement root react element for the control
      */
     public updateView(context: ComponentFramework.Context<IInputs>): React.ReactElement {
-        const props: IExpandableDetailsListProp = { context: context };
+        let height=(context.client as any).allocatedHeight
+        // this.root.style.setProperty('--gridHeightPopup', '');
+        // this.root.style.setProperty('--gridMainHeight', `${height * 0.70}px`);
+        const dataset = context.parameters.sampleDataSet;
+		const paging = context.parameters.sampleDataSet.paging;
+        const props: IExpandableDetailsListProp = { context: context, dataSet: dataset, paging: paging, notifyOutputChanged: this.notifyOutputChanged };
         return React.createElement(
             ExpandableDetailsList, props
         );
