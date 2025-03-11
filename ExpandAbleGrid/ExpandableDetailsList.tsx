@@ -7,14 +7,19 @@ import {
 	IDetailsRowBaseProps
 } from '@fluentui/react/lib/DetailsList';
 import { IconButton } from '@fluentui/react/lib/Button';
-import { ChevronDownRegular, ChevronRightRegular, StarRegular, CaretUpRegular } from "@fluentui/react-icons";
+import { ChevronDownRegular, ChevronRightRegular, StarRegular, CaretUpRegular, CheckmarkFilled } from "@fluentui/react-icons";
 import { IRenderFunction, IObjectWithKey } from '@fluentui/react/lib/Utilities';
 import { TextField, ITextFieldProps, ITextFieldStyleProps, ITextFieldStyles } from '@fluentui/react/lib/TextField';
 import { mergeStyles } from '@fluentui/react/lib/Styling';
 import { getTheme } from '@fluentui/react/lib/Styling';
 import { Stack, IStackStyles, IStackTokens, IStackItemStyles } from '@fluentui/react/lib/Stack';
 import { DefaultButton, PrimaryButton } from '@fluentui/react/lib/Button';
-import { FluentProvider, webLightTheme, Button, Avatar } from '@fluentui/react-components';
+import {
+	FluentProvider, webLightTheme, Avatar, buttonClassNames,
+	tokens,
+	Button,
+	Spinner,
+} from '@fluentui/react-components';
 import { FontIcon, Icon } from '@fluentui/react/lib/Icon';
 import { ScrollablePane, ScrollbarVisibility } from "@fluentui/react/lib/ScrollablePane";
 export interface IExpandableDetailsListProp {
@@ -28,6 +33,9 @@ import { SendRegular, CheckmarkRegular } from "@fluentui/react-icons";
 import { makeStyles, shorthands } from "@fluentui/react-components";
 
 type DataSet = ComponentFramework.PropertyHelper.DataSetApi.EntityRecord & IObjectWithKey;
+type LoadingState = "initial" | "loading" | "loaded";
+
+const automateUrl = "https://prod-26.uaenorth.logic.azure.com:443/workflows/61d472f0be5b4b78912d52a34096f571/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=ocrw7qmcPNiBgtsxCZJQCpr-xR3qcXG4vCuwgTfETpE";
 
 const theme = getTheme();
 
@@ -57,7 +65,8 @@ const gridStyles: Partial<IDetailsListStyles> = {
 	contentWrapper: {
 		flex: '1 1 auto',
 		width: '100%',
-		overflowX: 'hidden',
+		//overflowX: 'hidden',
+		overflow: 'auto'
 	},
 };
 const nonSelectedRowClass = mergeStyles({
@@ -132,6 +141,24 @@ const useClasses = makeStyles({
 // 		overflow: 'hidden',
 // 	},
 // };
+
+const markAllButtonStyles = makeStyles({
+	wrapper: {
+		columnGap: "15px",
+		display: "flex",
+	},
+	buttonNonInteractive: {
+		backgroundColor: tokens.colorNeutralBackground1,
+		border: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke1}`,
+		color: tokens.colorNeutralForeground1,
+		cursor: "default",
+		pointerEvents: "none",
+
+		[`& .${buttonClassNames.icon}`]: {
+			color: tokens.colorStatusSuccessForeground1,
+		},
+	},
+});
 
 const selectedRowClass = mergeStyles({
 	// selectors: {
@@ -265,8 +292,11 @@ const initialItems = [
 const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp> = (props) => {
 	const [expanded, setExpanded] = useState(false);
 	const [items, setItems] = useState<any>(initialItems);
+	const [studentChangedVals, setStudentChangedVals] = useState<any[]>([]); // for bulk update if needed.
 	const [selectedIndices, setSelectedIndices] = useState<number[]>([]); //need to use this to highlight selected row
 	const toggleExpanded = () => setExpanded(prev => !prev);
+	const [loadingState, setLoadingState] = useState<LoadingState>("initial");
+	const markAllButtonStyle = markAllButtonStyles();
 	const classes = useClasses();
 	const baseColumns: IColumn[] = [
 		{ key: 'StudentInfo', name: '', fieldName: 'StudentInfo', minWidth: 150, maxWidth: 150, isResizable: true },
@@ -436,6 +466,23 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 	];
 
 	const handleFieldChange = (key: string, fieldName: string, newValue: string | undefined) => {
+		let newState = [...studentChangedVals];
+		let thisRecord = newState.find((record: any) => record.key === key && record.fieldName === fieldName);
+
+		for (let index = 0; index < newState.length; index++) {
+			const element = newState[index];
+			element.changing = false;
+		}
+
+		if (thisRecord) {
+			thisRecord.value = newValue;	// Update existing record
+			thisRecord.changing = true;	// Update existing record
+		} else {
+			newState.push({ key: key, fieldName: fieldName, value: newValue, changing: true });	// Add new record
+		}
+
+		setStudentChangedVals(newState);
+	
 		setItems((prev: any) =>
 			prev.map((item: any) =>
 				item.key === key ? { ...item, [fieldName]: newValue ?? '' } : item
@@ -460,7 +507,54 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 								}} />
 						</Stack.Item>
 						<Stack.Item>
-							{item[column.fieldName as keyof any]}
+							{/* {item[column.fieldName as keyof any]} */}
+							<div style={{ width: '100%', height: '100%', padding: '1px 0' }}>
+								<TextField
+									value={item[column.fieldName as keyof any] || ''}
+									onChange={(e, newValue) => handleFieldChange(item.key, column.fieldName ?? '', newValue)}
+									onFocus={(e) => {
+										(e.target as HTMLInputElement).select();
+										const cellContainer = (e.target as HTMLElement).closest('.ms-DetailsRow-cell');
+										if (cellContainer) {
+											cellContainer.classList.add(editingCellOutlineClass);
+										}
+									}}
+									onBlur={(e) => {
+										const cellContainer = (e.target as HTMLElement).closest('.ms-DetailsRow-cell');
+										if (cellContainer) {
+											cellContainer.classList.remove(editingCellOutlineClass);
+										}
+										const editingVal = e.target.value;
+										let stateData = [...studentChangedVals];
+										let thisRecord = stateData.find((record: any) => record.value === editingVal && record.changing === true);
+										updateRecord(thisRecord);
+									}}
+									styles={{
+										root: {
+											minWidth: column.minWidth,
+											height: '100%',
+											width: '100%',
+											padding: '0 1px',
+										},
+										field: {
+											backgroundColor: 'transparent',
+											height: '100%',
+											padding: '0 4px',
+											width: '100%',
+										},
+										fieldGroup: [
+											{
+												width: '100%',
+												height: '100%',
+												border: 'none',
+												background: 'transparent',
+												outline: 'none',
+												"::after": { display: 'none !important' }
+											}
+										]
+									}}
+								/>
+							</div>
 						</Stack.Item>
 					</Stack>
 				)
@@ -574,13 +668,97 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 						}}
 					/>
 				</div>
-
 			);
 		}
 		return item[column?.fieldName ?? ''];
 	};
 	//#endregion
 
+	//#region Function
+	const onButtonClick = () => {
+		let data = { "test": "test" };
+		setLoadingState("loading");
+		// setTimeout(() => setLoadingState("loaded"), 5000);
+		var request = new XMLHttpRequest();
+		request.open("POST", props.context.parameters.PowerAutomateUrl.raw, true);
+		request.setRequestHeader("OData-MaxVersion", "4.0");
+		request.setRequestHeader("OData-Version", "4.0");
+		request.setRequestHeader("Accept", "application/json");
+		request.setRequestHeader("Content-Type", "application/json");
+		request.onreadystatechange = function () {
+			if (this.readyState === 4) {
+				request.onreadystatechange = null;
+				switch (this.status) {
+					case 200: // Operation success with content returned in response body.
+					case 201: // Create success. 
+					case 202: // Create success. 
+						setLoadingState("loaded");
+					case 204: // Operation success with no content returned in response body.
+						break;
+					default: // All other statuses are unexpected so are treated like errors.
+						var error;
+						try {
+							error = JSON.parse(request.response).error;
+						} catch (e) {
+							error = new Error("Unexpected Error");
+						}
+						break;
+				}
+			}
+		};
+		request.send(JSON.stringify(data));
+	};
+
+	const updateRecord = (data : any) => {
+		var request = new XMLHttpRequest();
+		request.open("POST", props.context.parameters.PowerAutomateUrl.raw, true);
+		request.setRequestHeader("OData-MaxVersion", "4.0");
+		request.setRequestHeader("OData-Version", "4.0");
+		request.setRequestHeader("Accept", "application/json");
+		request.setRequestHeader("Content-Type", "application/json");
+		request.onreadystatechange = function () {
+			if (this.readyState === 4) {
+				request.onreadystatechange = null;
+				switch (this.status) {
+					case 200: // Operation success with content returned in response body.
+					case 201: // Create success. 
+					case 202: // Create success.
+						break;
+						//setLoadingState("loaded");
+					case 204: // Operation success with no content returned in response body.
+						break;
+					default: // All other statuses are unexpected so are treated like errors.
+						var error;
+						try {
+							error = JSON.parse(request.response).error.message
+							console.log(error);
+						} catch (e) {
+							error = new Error("Unexpected Error");
+						}
+						break;
+				}
+			}
+		};
+		request.send(JSON.stringify(data));
+	}
+
+	const buttonContent = loadingState === "loading" ? "Loading" : loadingState === "loaded" ? "Loaded" : "Start loading";
+
+	const buttonIcon =
+		loadingState === "loading" ? (
+			<Spinner size="tiny" />
+		) : loadingState === "loaded" ? (
+			<CheckmarkFilled />
+		) : null;
+
+	const buttonClassName =
+		loadingState === "initial" ? undefined : markAllButtonStyle.buttonNonInteractive;
+
+	const onResetButtonClick = () => {
+		setLoadingState("initial");
+	};
+
+	//#endregion
 	const selection = React.useMemo(
 		() =>
 			new Selection({
@@ -658,11 +836,16 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 	return (
 		<div style={{ height: '100%', width: '100%' }}>
 			<FluentProvider theme={webLightTheme}>
-
 				<Stack enableScopedSelectors verticalFill grow verticalAlign="space-around" tokens={{ childrenGap: 20 }}>
 					<Stack enableScopedSelectors horizontalAlign="end" horizontal wrap tokens={wrapStackTokens} style={{ width: '100%' }}>
 						<Stack enableScopedSelectors horizontalAlign="end" horizontal wrap tokens={wrapStackTokensInnerButton}>
-							<Button>Mark All as Present</Button>
+							<Button
+								className={buttonClassName}
+								disabledFocusable={loadingState !== "initial"}
+								icon={buttonIcon}
+								onClick={onButtonClick}>
+								Mark All as Present
+							</Button>
 							<Button>Seating Plan</Button>
 							<Button>Class Team</Button>
 							<Button>Print List</Button>

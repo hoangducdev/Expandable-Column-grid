@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest>
-  <control namespace="ExpandAbleGrid" constructor="ExpanAbleGrid" version="0.0.12" display-name-key="ExpanAbleGrid" description-key="ExpanAbleGrid description" control-type="virtual" >
+  <control namespace="ExpandAbleGrid" constructor="ExpanAbleGrid" version="0.0.20" display-name-key="ExpanAbleGrid" description-key="ExpanAbleGrid description" control-type="virtual" >
     <!--external-service-usage node declares whether this 3rd party PCF control is using external service or not, if yes, this control will be considered as premium and please also add the external domain it is using.
     If it is not using any external service, please set the enabled="false" and DO NOT add any domain below. The "enabled" will be false by default.
     Example1:
@@ -20,10 +20,14 @@
     <!-- dataset node represents a set of entity records on CDS; allow more than one datasets -->
     <data-set name="sampleDataSet" display-name-key="Dataset_Display_Key">
       <!-- 'property-set' node represents a unique, configurable property that each record in the dataset must provide. -->
-      <!-- UNCOMMENT TO ADD PROPERTY-SET NODE
-      <property-set name="samplePropertySet" display-name-key="Property_Display_Key" description-key="Property_Desc_Key" of-type="SingleLine.Text" usage="bound" required="true" />
-      -->
+      <!-- <property-set name="PowerAutomateUrl" display-name-key="PowerAutomateUrl_Disp" description-key="PowerAutomateUrl_Desc" of-type="SingleLine.Text" usage="input" required="true" /> -->
     </data-set>
+     <property name="PowerAutomateUrl"
+      display-name-key="PowerAutomateUrl_Disp"
+      description-key="PowerAutomateUrl_Desc"
+      of-type="SingleLine.Text"
+      usage="input"
+      required="true"/>
     <resources>
       <code path="index.ts" order="1"/>
       <platform-library name="React" version="16.14.0" />
