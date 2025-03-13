@@ -35,7 +35,7 @@ import { makeStyles, shorthands } from "@fluentui/react-components";
 type DataSet = ComponentFramework.PropertyHelper.DataSetApi.EntityRecord & IObjectWithKey;
 type LoadingState = "initial" | "loading" | "loaded";
 
-const automateUrl = "https://prod-26.uaenorth.logic.azure.com:443/workflows/61d472f0be5b4b78912d52a34096f571/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=ocrw7qmcPNiBgtsxCZJQCpr-xR3qcXG4vCuwgTfETpE";
+const getStudentInfoUrl = "https://prod-27.uaenorth.logic.azure.com:443/workflows/28e4d484d3f744528344e98c03470d26/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=nywJ0xHyGbI5R1e_j67zhC6mnCbUtMnAhW55g2Dpf3U";
 
 const theme = getTheme();
 
@@ -61,12 +61,13 @@ const gridStyles: Partial<IDetailsListStyles> = {
 	},
 	headerWrapper: {
 		flex: '0 0 auto',
+		width: '100%',
 	},
 	contentWrapper: {
 		flex: '1 1 auto',
 		width: '100%',
-		//overflowX: 'hidden',
-		overflow: 'auto'
+		overflowX: 'hidden',
+		//overflow: 'auto'
 	},
 };
 const nonSelectedRowClass = mergeStyles({
@@ -118,30 +119,6 @@ const useClasses = makeStyles({
 	},
 });
 
-// const gridStyles: Partial<IDetailsListStyles> = {
-// 	root: {
-// 		overflowX: 'scroll',
-// 		selectors: {
-// 			'& [role=grid]': {
-// 				display: 'flex',
-// 				flexDirection: 'column',
-// 				alignItems: 'start',
-// 				height: '100%',
-// 				width: '100%',
-// 			},
-// 		},
-// 	},
-// 	headerWrapper: {
-// 		flex: '0 0 auto',
-// 	},
-// 	contentWrapper: {
-// 		flex: '1 1 auto',
-// 		// overflow: 'scroll',
-// 		// overflowY: 'auto',
-// 		overflow: 'hidden',
-// 	},
-// };
-
 const markAllButtonStyles = makeStyles({
 	wrapper: {
 		columnGap: "15px",
@@ -186,6 +163,7 @@ const editingCellOutlineClass = mergeStyles({
 	paddingLeft: '0px !important',
 	paddingRight: '0px !important',
 });
+
 const greenColumnClass = mergeStyles({
 	width: '100%',
 	selectors: {
@@ -404,8 +382,8 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 		,
 		{
 			key: 'G', name: 'G', fieldName: 'G', minWidth: 50, maxWidth: 50, isResizable: true,
-			className: blueColumnClass,       // Cells cột F
-			headerClassName: blueHeaderClass, // Header cột F
+			className: blueColumnClass,
+			headerClassName: blueHeaderClass,
 			onRenderHeader: (colProps?: IDetailsColumnProps, defaultRender?: IRenderFunction<IDetailsColumnProps>,): JSX.Element | null => (
 				<div
 					className={mergeStyles({
@@ -482,7 +460,7 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 		}
 
 		setStudentChangedVals(newState);
-	
+
 		setItems((prev: any) =>
 			prev.map((item: any) =>
 				item.key === key ? { ...item, [fieldName]: newValue ?? '' } : item
@@ -709,7 +687,46 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 		request.send(JSON.stringify(data));
 	};
 
-	const updateRecord = (data : any) => {
+	const getStudentInfo = (attendanceId: any) => {
+		return new Promise(function (resolve, reject) {
+			const data = { "attendanceId": attendanceId };
+			var request = new XMLHttpRequest();
+			request.open("POST", props.context.parameters.PowerAutomateUrl.raw, true);
+			request.setRequestHeader("OData-MaxVersion", "4.0");
+			request.setRequestHeader("OData-Version", "4.0");
+			request.setRequestHeader("Accept", "application/json");
+			request.setRequestHeader("Content-Type", "application/json");
+			request.onreadystatechange = function () {
+				if (this.readyState === 4) {
+					request.onreadystatechange = null;
+					switch (this.status) {
+						case 200: // Operation success with content returned in response body.
+							debugger;
+							resolve(request.response);
+							break;
+						case 201: // Create success. 
+						case 202: // Create success.
+							break;
+						//setLoadingState("loaded");
+						case 204: // Operation success with no content returned in response body.
+							break;
+						default: // All other statuses are unexpected so are treated like errors.
+							var error;
+							try {
+								error = JSON.parse(request.response).error.message
+								console.log(error);
+							} catch (e) {
+								error = new Error("Unexpected Error");
+							}
+							break;
+					}
+				}
+			};
+			request.send(JSON.stringify(data));
+		});
+	}
+
+	const updateRecord = (data: any) => {
 		var request = new XMLHttpRequest();
 		request.open("POST", props.context.parameters.PowerAutomateUrl.raw, true);
 		request.setRequestHeader("OData-MaxVersion", "4.0");
@@ -724,7 +741,7 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 					case 201: // Create success. 
 					case 202: // Create success.
 						break;
-						//setLoadingState("loaded");
+					//setLoadingState("loaded");
 					case 204: // Operation success with no content returned in response body.
 						break;
 					default: // All other statuses are unexpected so are treated like errors.
@@ -770,7 +787,23 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 		[]
 	);
 
+	const composeData = async () => {
+		let sortedRecordIds = props.dataSet.sortedRecordIds;
+		for (let index = 0; index < sortedRecordIds.length; index++) {
+			debugger;
+			const recordId = sortedRecordIds[index];
+			const record = props.dataSet.records[recordId];
+			const attendanceName = record.getValue('tmrw_name');
+			let result = await getStudentInfo(recordId);
+			console.log(result);
+		}
+	}
+
 	useEffect(() => {
+		async function initDetailList() {
+			await composeData();
+		}
+
 		let items: any = props.dataSet.sortedRecordIds.map((id: string) => {
 			const record = props.dataSet.records[id];
 			return {
@@ -783,7 +816,7 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 				F: record.getValue('address1_line3'),
 			};
 		})
-
+		initDetailList();
 		setItems(items);
 	}, [props.dataSet]);
 
