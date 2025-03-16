@@ -36,6 +36,7 @@ type DataSet = ComponentFramework.PropertyHelper.DataSetApi.EntityRecord & IObje
 type LoadingState = "initial" | "loading" | "loaded";
 
 const getStudentInfoUrl = "https://prod-27.uaenorth.logic.azure.com:443/workflows/28e4d484d3f744528344e98c03470d26/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=nywJ0xHyGbI5R1e_j67zhC6mnCbUtMnAhW55g2Dpf3U";
+const getSchoolSettingUrl = "https://prod-31.uaenorth.logic.azure.com:443/workflows/1ea987348dcd488aad45b8f66aefd670/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=HVVTB5sy6pquxxEFNkbtTj1TiaZJVFRyjE1Qsn1QNZY";
 
 const theme = getTheme();
 
@@ -270,6 +271,7 @@ const initialItems = [
 const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp> = (props) => {
 	const [expanded, setExpanded] = useState(false);
 	const [items, setItems] = useState<any>(initialItems);
+	const [isShowHistory, setIsShowHistory] = useState<boolean>(false);
 	const [studentChangedVals, setStudentChangedVals] = useState<any[]>([]); // for bulk update if needed.
 	const [selectedIndices, setSelectedIndices] = useState<number[]>([]); //need to use this to highlight selected row
 	const toggleExpanded = () => setExpanded(prev => !prev);
@@ -687,15 +689,16 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 		request.send(JSON.stringify(data));
 	};
 
-	const getStudentInfo = (attendanceId: any) => {
+	const getSchoolSetting = (attendanceId: any) => {
 		return new Promise(function (resolve, reject) {
 			const data = { "attendanceId": attendanceId };
 			var request = new XMLHttpRequest();
-			request.open("POST", props.context.parameters.PowerAutomateUrl.raw, true);
+			request.open("POST", getSchoolSettingUrl, true);
 			request.setRequestHeader("OData-MaxVersion", "4.0");
 			request.setRequestHeader("OData-Version", "4.0");
 			request.setRequestHeader("Accept", "application/json");
 			request.setRequestHeader("Content-Type", "application/json");
+			request.timeout = 20000;
 			request.onreadystatechange = function () {
 				if (this.readyState === 4) {
 					request.onreadystatechange = null;
@@ -726,6 +729,45 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 		});
 	}
 
+	const getStudentInfo = (attendanceId: any) => {
+		return new Promise(function (resolve, reject) {
+			const data = { "attendanceId": attendanceId };
+			var request = new XMLHttpRequest();
+			request.open("POST", getStudentInfoUrl, true);
+			request.setRequestHeader("OData-MaxVersion", "4.0");
+			request.setRequestHeader("OData-Version", "4.0");
+			request.setRequestHeader("Accept", "application/json");
+			request.setRequestHeader("Content-Type", "application/json");
+			request.timeout = 20000;
+			request.onreadystatechange = function () {
+				if (this.readyState === 4) {
+					request.onreadystatechange = null;
+					switch (this.status) {
+						case 200: // Operation success with content returned in response body.
+							debugger;
+							resolve(request.response);
+							break;
+						case 201: // Create success. 
+						case 202: // Create success.
+							break;
+						//setLoadingState("loaded");
+						case 204: // Operation success with no content returned in response body.
+							break;
+						default: // All other statuses are unexpected so are treated like errors.
+							var error;
+							try {
+								error = JSON.parse(request.response).error.message
+								console.log(error);
+							} catch (e) {
+								error = new Error("Unexpected Error");
+							}
+							break;
+					}
+				}
+			};
+			request.send(JSON.stringify(data));
+		});
+	}
 	const updateRecord = (data: any) => {
 		var request = new XMLHttpRequest();
 		request.open("POST", props.context.parameters.PowerAutomateUrl.raw, true);
@@ -801,6 +843,8 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 
 	useEffect(() => {
 		async function initDetailList() {
+			const isShowHistory : any = await getSchoolSetting(props.dataSet.sortedRecordIds[0]);
+			setIsShowHistory(isShowHistory.isShowHistory);
 			await composeData();
 		}
 
@@ -808,7 +852,7 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 			const record = props.dataSet.records[id];
 			return {
 				key: record.getRecordId(),
-				StudentInfo: record.getValue('fullname'),
+				StudentInfo: record.getValue('tmrw_name'),
 				B: record.getValue('house'),
 				C: record.getValue('birthdate'),
 				D: record.getValue('address1_line1'),
