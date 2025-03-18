@@ -45,6 +45,7 @@ const innerTableStackTokens: IStackTokens = { childrenGap: 30 };
 const wrapStackTokensInnerButton: IStackTokens = { childrenGap: 7 };
 const headingStackTokens: IStackTokens = { childrenGap: 30 };
 const studentStackTokens: IStackTokens = { childrenGap: 10 };
+const weekDayNamesShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 //#region Styles
 const gridStyles: Partial<IDetailsListStyles> = {
@@ -258,6 +259,27 @@ const blueHeaderClass = mergeStyles({
 	},
 });
 //#endregion
+
+//#region Helper Functions
+// Helper function to determine if a date is in the current week
+function isDateInCurrentWeek(date: Date): boolean {
+	const today = new Date();
+	const dayOfWeek = today.getDay(); // Sunday is 0, Saturday is 6
+
+	// Get start of the week (Sunday)
+	const startOfWeek = new Date(today);
+	startOfWeek.setDate(today.getDate() - dayOfWeek);
+	startOfWeek.setHours(0, 0, 0, 0); // set to start of day
+
+	// Get end of the week (Saturday)
+	const endOfWeek = new Date(today);
+	endOfWeek.setDate(today.getDate() + (6 - dayOfWeek));
+	endOfWeek.setHours(23, 59, 59, 999); // set to end of day
+
+	return date >= startOfWeek && date <= endOfWeek;
+}
+
+//#endregion
 const initialItems = [
 	{ key: '1', StudentInfo: 'Student Name', B: 'House Name ID1234', C: 'Today', D: 'Item 1-D', E: 'Item 1-E', F: 'Item 1-F' },
 	{ key: '2', StudentInfo: 'Student Name', B: 'House Name ID1234', C: 'Today', D: 'Item 1-D', E: 'Item 1-E', F: 'Item 1-F' },
@@ -270,8 +292,10 @@ const initialItems = [
 
 const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp> = (props) => {
 	const [expanded, setExpanded] = useState(false);
-	const [items, setItems] = useState<any>(initialItems);
+	const [items, setItems] = useState<any>([]);
 	const [isShowHistory, setIsShowHistory] = useState<boolean>(false);
+	const [attendanceTimeFrame, setAttendanceTimeFrame] = useState<any[]>(["100000002"]);
+	const [extraColumnToDisplay, setextraColumnToDisplay] = useState<IColumn[]>([]);
 	const [studentChangedVals, setStudentChangedVals] = useState<any[]>([]); // for bulk update if needed.
 	const [selectedIndices, setSelectedIndices] = useState<number[]>([]); //need to use this to highlight selected row
 	const toggleExpanded = () => setExpanded(prev => !prev);
@@ -283,18 +307,18 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 		{ key: 'StudentProfile', name: '', fieldName: 'StudentProfile', minWidth: 200, maxWidth: 200, isResizable: true },
 		{
 			key: 'History',
-			name: 'HISTORY',
+			name: 'History',
 			fieldName: 'History',
-			minWidth: 200,
-			maxWidth: 200,
+			minWidth: 50,
+			maxWidth: 70,
 			isResizable: true,
 			onRenderHeader: (colProps?: IDetailsColumnProps, defaultRender?: IRenderFunction<IDetailsColumnProps>,): JSX.Element | null => (
 				<div
 					style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}
-					onClick={toggleExpanded}
+					onClick={isShowHistory ? toggleExpanded : undefined}
 				>
-					<span>HISTORY</span>
-					<Button
+					<span>History</span>
+					{isShowHistory && (<Button
 						size="medium"
 						icon={expanded ? <ChevronRightRegular /> : <ChevronDownRegular />}
 						onClick={(e) => {
@@ -304,145 +328,17 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 						title={expanded ? 'Collapse' : 'Expand'}
 						aria-label={expanded ? 'Collapse' : 'Expand'}
 						className={noBgButtonClass}
-					/>
-
+					/>)}
 				</div>
 			)
+		},
+		{
+			key: 'AttendanceRate', name: 'Attendance Rate', fieldName: 'AttendanceRate', minWidth: 50, maxWidth: 50, isResizable: true
 		}
 	];
 
-	const extraColumns: IColumn[] = [
-		{
-			key: 'D', name: 'Line1\nLine2\nLine3', fieldName: 'D', minWidth: 50, maxWidth: 50, isResizable: true,
-			onRenderHeader: (colProps?: IDetailsColumnProps, defaultRender?: IRenderFunction<IDetailsColumnProps>,): JSX.Element | null => (
-				<div
-					className={mergeStyles({
-						minHeight: '30px',
-						width: '100%',
-						height: 'auto',
-						padding: '4px 0px',
-						display: 'flex',
-						flexDirection: 'column',
-						justifyContent: 'center',
-						alignItems: 'center',
-						overflow: 'visible',
-						boxSizing: 'border-box',
-					})}
-				>
-					<span style={{ lineHeight: '1.2', marginTop: -5 }}>MON</span>
-					<span style={{ lineHeight: '1.2', marginTop: -3 }}>03/02</span>
-					<span style={{ lineHeight: '1.2', marginTop: -2 }}>P1</span>
-				</div>
-			)
-		},
-		{
-			key: 'E', name: 'E', fieldName: 'E', minWidth: 50, maxWidth: 50, isResizable: true,
-			onRenderHeader: (colProps?: IDetailsColumnProps, defaultRender?: IRenderFunction<IDetailsColumnProps>,): JSX.Element | null => (
-				<div
-					className={mergeStyles({
-						minHeight: '30px',
-						height: 'auto',
-						padding: '4px 0px',
-						display: 'flex',
-						flexDirection: 'column',
-						justifyContent: 'center',
-						alignItems: 'center',
-						overflow: 'visible',
-						boxSizing: 'border-box',
-					})}
-				>
-					<span style={{ lineHeight: '1.2', marginTop: -5 }}>MON</span>
-					<span style={{ lineHeight: '1.2', marginTop: -3 }}>03/02</span>
-					<span style={{ lineHeight: '1.2', marginTop: -2 }}>P2</span>
-				</div>
-			)
-		},
-		{
-			key: 'F', name: 'F', fieldName: 'F', minWidth: 50, maxWidth: 50, isResizable: true,
-			className: greenColumnClass,
-			headerClassName: greenHeaderClass,
-			onRenderHeader: (colProps?: IDetailsColumnProps, defaultRender?: IRenderFunction<IDetailsColumnProps>,): JSX.Element | null => (
-				<div
-					className={mergeStyles({
-						minHeight: '30px',
-						height: 'auto',
-						padding: '4px 0px',
-						display: 'flex',
-						flexDirection: 'column',
-						justifyContent: 'center',
-						alignItems: 'center',
-						overflow: 'visible',
-						boxSizing: 'border-box',
-					})}
-				>
-					<span style={{ lineHeight: '1.2', marginTop: -5 }}>MON</span>
-					<span style={{ lineHeight: '1.2', marginTop: -3 }}>03/02</span>
-					<span style={{ lineHeight: '1.2', marginTop: -2 }}>P3</span>
-				</div>
-			)
-		}
-		,
-		{
-			key: 'G', name: 'G', fieldName: 'G', minWidth: 50, maxWidth: 50, isResizable: true,
-			className: blueColumnClass,
-			headerClassName: blueHeaderClass,
-			onRenderHeader: (colProps?: IDetailsColumnProps, defaultRender?: IRenderFunction<IDetailsColumnProps>,): JSX.Element | null => (
-				<div
-					className={mergeStyles({
-						minHeight: '30px',
-						height: 'auto',
-						padding: '4px 0px',
-						display: 'flex',
-						flexDirection: 'column',
-						justifyContent: 'center',
-						alignItems: 'center',
-						overflow: 'visible',
-						boxSizing: 'border-box',
-					})}
-				>
-					<span style={{ lineHeight: '1.2', marginTop: -5 }}>MON</span>
-					<span style={{ lineHeight: '1.2', marginTop: -3 }}>03/02</span>
-					<span style={{ lineHeight: '1.2', marginTop: -2 }}>P4</span>
-				</div>
-			)
-		},
-		{
-			key: 'H', name: 'H', fieldName: 'H', minWidth: 50, maxWidth: 100, isResizable: true,
-			onRenderHeader: (colProps?: IDetailsColumnProps, defaultRender?: IRenderFunction<IDetailsColumnProps>,): JSX.Element | null => (
-				<div
-					className={mergeStyles({
-						minHeight: '30px',
-						height: 'auto',
-						padding: '4px 0px',
-						display: 'flex',
-						flexDirection: 'column',
-						justifyContent: 'center',
-						alignItems: 'center',
-						overflow: 'visible',
-						boxSizing: 'border-box',
-					})}
-				>
-					<span style={{ lineHeight: '1.2', marginTop: -5 }}>MON</span>
-					<span style={{ lineHeight: '1.2', marginTop: -3 }}>03/02</span>
-					<span style={{ lineHeight: '1.2', marginTop: -2 }}>P5</span>
-				</div>
-			)
-		},
-		{
-			key: 'AttendanceRate', name: 'Attendance Rate', fieldName: 'AttendanceRate', minWidth: 50, maxWidth: 50, isResizable: true,
-			// onRender(item, index, column) {
-			// 	if (column?.key === columns[columns.length - 1].key) {
-			// 		// This is the last column
-			// 		return (
-			// 		  <div style={{ borderLeft: "2px solid black", height: "100%", padding: 4 }}>
-			// 			{item[column.fieldName as keyof typeof item]}
-			// 		  </div>
-			// 		);
-			// 	  }
-			// 	  // Default rendering
-			// 	  return <span>{item[column?.fieldName as keyof typeof item]}</span>;
-			// },
-		}
+	const historyColumn: IColumn[] = [
+		{ key: 'HistoryDetail', name: '', fieldName: 'HistoryDetail', minWidth: 150, maxWidth: 150, isResizable: true },
 	];
 
 	const handleFieldChange = (key: string, fieldName: string, newValue: string | undefined) => {
@@ -470,7 +366,13 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 		);
 	};
 
-	const columns: IColumn[] = expanded ? [...baseColumns, ...extraColumns] : baseColumns;
+	const columns: IColumn[] = expanded
+		? [
+			...baseColumns.slice(0, 3),
+			...historyColumn,
+			...extraColumnToDisplay,
+		]
+		: [...baseColumns.slice(0, 3), ...extraColumnToDisplay, ...baseColumns.slice(3, 4)];
 
 	//#region Custom Items for each cell
 	const onRenderItemColumn = (item?: any, index?: number, column?: IColumn) => {
@@ -539,6 +441,7 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 					</Stack>
 				)
 			}
+
 			if (column?.fieldName === 'StudentProfile') {
 				return (
 					<Stack enableScopedSelectors horizontal verticalAlign='center' tokens={studentStackTokens} style={{ width: '100%', height: '100%' }}>
@@ -559,15 +462,25 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 				return (
 					<div style={{ width: '100%', height: '100%', padding: '1px 0' }}>
 						<Stack enableScopedSelectors horizontalAlign="start" verticalAlign='center' horizontal tokens={innerTableStackTokens}>
-							<span >Today</span>
+							<span >{isShowHistory ? 'Past Week' : 'Today'}</span>
+						</Stack>
+					</div>
+				)
+			}
+
+			if (column?.fieldName === 'HistoryDetail') {
+				return (
+					<div style={{ width: '100%', height: '100%', padding: '1px 0' }}>
+						<Stack enableScopedSelectors horizontalAlign="start" verticalAlign='center' horizontal tokens={innerTableStackTokens}>
+							{/* <span >{isShowHistory ? 'Past Week' : 'Today'}</span> */}
 							<table style={{ width: '100px', borderCollapse: 'collapse' }}>
 								<tbody>
 									<tr>
-										<td style={{ border: 'none' }}>1</td>
-										<td style={{ border: 'none' }}>2</td>
-										<td style={{ border: 'none' }}>3</td>
-										<td style={{ border: 'none' }}>4</td>
-										<td style={{ border: 'none' }}>5</td>
+										<td style={{ border: 'none' }}>{attendanceTimeFrame.includes("100000002") ? 1 : 'M'}</td>{/*// 100000002 is Lesson, 100000000 is AM, 100000001 is PM*/}
+										<td style={{ border: 'none' }}>{attendanceTimeFrame.includes("100000002") ? 1 : 'T'}</td>
+										<td style={{ border: 'none' }}>{attendanceTimeFrame.includes("100000002") ? 1 : 'W'}</td>
+										<td style={{ border: 'none' }}>{attendanceTimeFrame.includes("100000002") ? 1 : 'T'}</td>
+										<td style={{ border: 'none' }}>{attendanceTimeFrame.includes("100000002") ? 1 : 'F'}</td>
 									</tr>
 									<tr>
 										<td style={{ border: 'none' }}><CheckmarkRegular className={classes.icon48} /></td>
@@ -581,6 +494,36 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 						</Stack>
 					</div>
 				);
+			}
+
+			for (let index = 0; index < item.attendanceInfo.length; index++) {
+				const element = item.attendanceInfo[index];
+				if (element.key == column.key && element.isPresent) {
+					return (
+						<div style={{ width: '100%', height: '100%', position: 'relative', zIndex: 2, alignItems: 'center' }}>
+							<CheckmarkRegular style={{
+								width: '32px',
+								height: '32px',
+								fill: 'black',
+							}} />
+						</div>
+					);
+				}
+			}
+
+			if (column.key === item.key) {
+				if (item.isPresent) {
+					return (
+						<div style={{ width: '100%', height: '100%', position: 'relative', zIndex: 2, alignItems: 'center' }}>
+							<CheckmarkRegular style={{
+								width: '32px',
+								height: '32px',
+								fill: 'black',
+							}} />
+						</div>
+					);
+				}
+				else return null;
 			}
 
 			if (column?.fieldName === 'D' || column?.fieldName === 'E' || column?.fieldName === 'F') {
@@ -704,7 +647,6 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 					request.onreadystatechange = null;
 					switch (this.status) {
 						case 200: // Operation success with content returned in response body.
-							debugger;
 							resolve(request.response);
 							break;
 						case 201: // Create success. 
@@ -716,7 +658,7 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 						default: // All other statuses are unexpected so are treated like errors.
 							var error;
 							try {
-								error = JSON.parse(request.response).error.message
+								resolve(request.response);
 								console.log(error);
 							} catch (e) {
 								error = new Error("Unexpected Error");
@@ -744,7 +686,6 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 					request.onreadystatechange = null;
 					switch (this.status) {
 						case 200: // Operation success with content returned in response body.
-							debugger;
 							resolve(request.response);
 							break;
 						case 201: // Create success. 
@@ -756,7 +697,7 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 						default: // All other statuses are unexpected so are treated like errors.
 							var error;
 							try {
-								error = JSON.parse(request.response).error.message
+								resolve(request.response);
 								console.log(error);
 							} catch (e) {
 								error = new Error("Unexpected Error");
@@ -768,6 +709,7 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 			request.send(JSON.stringify(data));
 		});
 	}
+
 	const updateRecord = (data: any) => {
 		var request = new XMLHttpRequest();
 		request.open("POST", props.context.parameters.PowerAutomateUrl.raw, true);
@@ -830,39 +772,197 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 	);
 
 	const composeData = async () => {
+		//aaaaaa
 		let sortedRecordIds = props.dataSet.sortedRecordIds;
-		for (let index = 0; index < sortedRecordIds.length; index++) {
-			debugger;
-			const recordId = sortedRecordIds[index];
-			const record = props.dataSet.records[recordId];
-			const attendanceName = record.getValue('tmrw_name');
-			let result = await getStudentInfo(recordId);
-			console.log(result);
+		const promises = sortedRecordIds.map(recordId => getStudentInfo(recordId));
+		const results = await Promise.all(promises);
+		return results;
+	}
+
+	const composeIntoColumns = (data: any): IColumn[] => {
+		const extraColumns: IColumn[] = [];
+
+		const groupedByDate = data.reduce((group: any, record: any) => {
+			const date = record.attendanceDate;
+			if (!group[date]) {
+				group[date] = [];
+			}
+			group[date].push(record);
+			return group;
+		}, {});
+
+		const sortedGroupedByDate = Object.keys(groupedByDate)
+			.sort((a, b) => new Date(a).getTime() - new Date(b).getTime()) // Sort dates in ascending order
+			.reduce((acc: any, key: any) => {
+				acc[key] = groupedByDate[key];
+				return acc;
+			}, {});
+
+		for (const key in sortedGroupedByDate) {
+			if (sortedGroupedByDate.hasOwnProperty(key)) {
+				const value = sortedGroupedByDate[key];
+				value.forEach((element: any) => {
+					const attendanceDateObj = new Date(element.attendanceDate);
+					const weekDayNumber = attendanceDateObj.getDay();
+					const weekDayName = weekDayNamesShort[weekDayNumber];
+					const attendanceMonthIndexed = attendanceDateObj.getMonth() + 1;
+					const attendanceDate = attendanceDateObj.getDate();
+					const formattedMonth = attendanceMonthIndexed.toString().padStart(2, '0');
+					const formattedattendanceDate = attendanceDate.toString().padStart(2, '0');
+					if (isDateInCurrentWeek(new Date(element.attendanceDate)) && (element.timeFrameType === 100000001 || element.timeFrameType === 100000000)) {
+						extraColumns.push({
+							key: element.key,
+							name: '',
+							fieldName: '',
+							minWidth: 50,
+							maxWidth: 100,
+							className: blueColumnClass,
+							headerClassName: blueHeaderClass,
+							isResizable: true,
+							onRenderHeader: (colProps?: IDetailsColumnProps, defaultRender?: IRenderFunction<IDetailsColumnProps>): JSX.Element | null => (
+								<div
+									className={mergeStyles({
+										minHeight: '30px',
+										height: 'auto',
+										padding: '4px 0px',
+										display: 'flex',
+										flexDirection: 'column',
+										justifyContent: 'center',
+										alignItems: 'center',
+										overflow: 'visible',
+										boxSizing: 'border-box',
+									})}
+								>
+									<span style={{ lineHeight: '1.2', marginTop: -5 }}>{weekDayName}</span>
+									<span style={{ lineHeight: '1.2', marginTop: -3 }}>{formattedattendanceDate + "/" + formattedMonth}</span>
+									<span style={{ lineHeight: '1.2', marginTop: -2 }}>{element.timeFrameType === 100000001 ? "PM" : "AM"}</span>
+								</div>
+							)
+						});
+					}
+					else if (isDateInCurrentWeek(new Date(element.attendanceDate)) && (element.timeFrameType !== 100000001 || element.timeFrameType !== 100000000)) {
+						extraColumns.push(
+							{
+								key: element.key,
+								name: '',
+								fieldName: '',
+								minWidth: 50,
+								maxWidth: 70,
+								isResizable: true,
+								className: blueColumnClass,
+								headerClassName: blueHeaderClass,
+								onRenderHeader: (colProps?: IDetailsColumnProps, defaultRender?: IRenderFunction<IDetailsColumnProps>): JSX.Element | null => (
+									<div
+										className={mergeStyles({
+											minHeight: '30px',
+											width: '100%',
+											height: 'auto',
+											padding: '4px 0px',
+											display: 'flex',
+											flexDirection: 'column',
+											justifyContent: 'center',
+											alignItems: 'center',
+											overflow: 'visible',
+											boxSizing: 'border-box',
+										})}
+									>
+										<span style={{ lineHeight: '1.2', marginTop: -5 }}>{weekDayName}</span>
+										<span style={{ lineHeight: '1.2', marginTop: -3 }}>{formattedattendanceDate + "/" + formattedMonth}</span>
+										<span style={{ lineHeight: '1.2', marginTop: -2 }}></span>
+									</div>
+								)
+							}
+						);
+					}
+				});
+			}
 		}
+
+		return extraColumns;
 	}
 
 	useEffect(() => {
-		async function initDetailList() {
-			const isShowHistory : any = await getSchoolSetting(props.dataSet.sortedRecordIds[0]);
-			setIsShowHistory(isShowHistory.isShowHistory);
-			await composeData();
-		}
+		if (!props.dataSet.loading) {
+			async function initDetailList(extraColumns: IColumn[]) {
+				// Get school setting
+				const schoolSettingJson: any = await getSchoolSetting(props.dataSet.sortedRecordIds[0]);
 
-		let items: any = props.dataSet.sortedRecordIds.map((id: string) => {
-			const record = props.dataSet.records[id];
-			return {
-				key: record.getRecordId(),
-				StudentInfo: record.getValue('tmrw_name'),
-				B: record.getValue('house'),
-				C: record.getValue('birthdate'),
-				D: record.getValue('address1_line1'),
-				E: record.getValue('address1_line2'),
-				F: record.getValue('address1_line3'),
-			};
-		})
-		initDetailList();
-		setItems(items);
-	}, [props.dataSet]);
+				if (schoolSettingJson !== "") {
+					const schoolSettingResult = JSON.parse(schoolSettingJson);
+					const attendanceTimeFrameSetting = schoolSettingResult.attendanceTimeFrame;
+					const attendanceTimeFrameArr = attendanceTimeFrameSetting.split(",");
+					setAttendanceTimeFrame(attendanceTimeFrameArr);
+
+					setIsShowHistory(schoolSettingResult.isShowHistory === "True" ? true : false);
+				}
+
+				setextraColumnToDisplay(extraColumns);
+			}
+
+			let items: any = props.dataSet.sortedRecordIds.map((id: string) => {
+				const record = props.dataSet.records[id];
+				const attendanceDate = record.getValue('tmrw_attendancedate') as Date;
+				return {
+					key: record.getRecordId(),
+					StudentInfo: record.getValue('tmrw_name'),
+					attendanceDate: attendanceDate?.toLocaleDateString(),
+					isPresent: record.getValue('tmrw_ispresent'),
+					timeFrameType: record.getValue('tmrw_timeframetype'),
+					E: record.getValue(''),
+					F: record.getValue(''),
+				};
+			});
+
+			const extraColumns = composeIntoColumns(items);
+
+			async function distinctData() {
+				debugger;
+				const studentInfo = await composeData();
+				const studentInfoArrayObj = studentInfo.map((jsonStr: any) => JSON.parse(jsonStr));
+
+				const lookupMap = studentInfoArrayObj.reduce((acc, { attendanceId, studentId }) => {
+					acc[attendanceId] = studentId;
+					return acc;
+				}, {});
+
+				const joinedRecords = items.map((record: any) => ({
+					...record,
+					studentId: lookupMap[record.key] || null
+				}));
+
+				const groupedByStudent = joinedRecords.reduce((acc: any, record: any) => {
+					if (!acc[record.studentId]) {
+						acc[record.studentId] = [];
+					}
+					acc[record.studentId].push(record);
+					return acc;
+				}, {});
+
+				const distinctCombinedOutput = Object.keys(groupedByStudent).map(studentId => {
+					const records = groupedByStudent[studentId];
+					const { key, StudentInfo, attendanceDate, timeFrameType, E, F, studentId: sId } = records[0];
+
+					return {
+						key: sId,
+						StudentInfo,
+						attendanceDate,
+						timeFrameType,
+						E,
+						F,
+						studentId: sId,
+						attendanceInfo: records.map((r: any) => ({ key: r.key, isPresent: r.isPresent }))
+					};
+				});
+
+				setItems(distinctCombinedOutput);
+				console.log('');
+			}
+
+			initDetailList(extraColumns);
+			distinctData();
+			//setItems(items);
+		}
+	}, [props.dataSet.sortedRecordIds]);
 
 	const _onRenderRow: IDetailsListProps['onRenderRow'] = props => {
 		if (!props) return null;
@@ -910,6 +1010,7 @@ const ExpandableDetailsList: React.FunctionComponent<IExpandableDetailsListProp>
 			overflowX: 'hidden'
 		},
 	};
+
 	return (
 		<div style={{ height: '100%', width: '100%' }}>
 			<FluentProvider theme={webLightTheme}>
